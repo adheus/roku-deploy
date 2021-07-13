@@ -784,6 +784,7 @@ export class RokuDeploy {
              await this.doPostRequest(deleteOptions);
         } catch (exception) {
             if (exception.message.indexOf('Delete Succeeded') === -1) {
+                console.log("The error happened here indeed, sir");
                 throw exception;
             }
         }
@@ -797,14 +798,18 @@ export class RokuDeploy {
         let originalOptionValueRetainStagingFolder = options.retainStagingFolder;
         options = this.getOptions(options);
         options.retainStagingFolder = true;
+        console.log("deploying..");
         await this.deploy(options, beforeZipCallback);
 
         if (options.convertToSquashfs) {
             await this.convertToSquashfs(options);
         }
 
+        console.log("converted to squash..");
         let remotePkgPath = await this.signExistingPackage(options);
+        console.log("signed the package...");
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
+        console.log("retrieved the package");
         if (originalOptionValueRetainStagingFolder !== true) {
             await this.fsExtra.remove(options.stagingFolderPath);
         }
