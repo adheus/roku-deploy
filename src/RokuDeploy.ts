@@ -800,7 +800,8 @@ export class RokuDeploy {
         options.retainStagingFolder = true;
         console.log("deploying..");
         await this.deploy(options, beforeZipCallback);
-
+        console.log("deployed!");
+        console.log("converting to squashfs...");
         if (options.convertToSquashfs) {
             await this.convertToSquashfs(options);
         }
