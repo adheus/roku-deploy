@@ -732,7 +732,12 @@ export class RokuDeploy {
     public async deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
         options = this.getOptions(options);
         await this.createPackage(options, beforeZipCallback);
+        console.log("deleting current package");
         await this.deleteInstalledChannel(options);
+        // Wait for device to possibly leave current application or screensaver
+        await util.sleep(this.pressHomeButtonWaitIntervalInMillis);
+
+        console.log("publishing package...");
         let result = await this.publish(options);
         return result;
     }
