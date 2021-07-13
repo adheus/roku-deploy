@@ -26,7 +26,7 @@ export class RokuDeploy {
     public request = request;
     public fsExtra = _fsExtra;
 
-    pressHomeButtonWaitIntervalInMillis = 5000;
+    pressHomeButtonWaitIntervalInMillis = 10000;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -769,7 +769,7 @@ export class RokuDeploy {
      * Deletes any signed package on the target Roku device
      * @param options
      */
-    public async deleteSignedPackage(options?: RokuDeployOptions) {
+    async deleteSignedPackage(options?: RokuDeployOptions) {
         options = this.getOptions(options);
         
         let deleteOptions = this.generateBaseRequestOptions('plugin_package', options);
@@ -780,9 +780,12 @@ export class RokuDeploy {
             passwd: ''
         };
 
-        let results = await this.doPostRequest(deleteOptions);
-        if (results.body.indexOf('Delete Succeeded') === -1) {
-            throw new errors.FailedDeviceResponseError('Failed to delete current installed channel');
+        try {
+             await this.doPostRequest(deleteOptions);
+        } catch (exception) {
+            if (exception.message.indexOf('Delete Succeeded') === -1) {
+                throw exception;
+            }
         }
     }
 
