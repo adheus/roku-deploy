@@ -1,8 +1,8 @@
-import * as assert from 'assert';
-import * as chai from 'chai';
-import * as chaiFiles from 'chai-files';
-import * as fsExtra from 'fs-extra';
-import * as path from 'path';
+import assert from 'assert';
+import chai from 'chai';
+import chaiFiles from 'chai-files';
+import fsExtra from 'fs-extra';
+import path from 'path';
 
 import * as rokuDeploy from './index';
 
@@ -42,6 +42,7 @@ describe('device', function device() {
 
     describe('deploy', () => {
         it('works', async () => {
+
             let response = await rokuDeploy.deploy(options);
             assert.equal(response.message, 'Successful deploy');
         });

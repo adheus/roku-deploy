@@ -1,6 +1,9 @@
 import path from 'path';
 import _fsExtra from 'fs-extra';
-import request from 'request';
+import http from 'http';
+import DigestFetch from 'digest-fetch';
+import fetch from 'node-fetch';
+import FormData from 'form-data';
 import JSZip from 'jszip';
 import dateformat from 'dateformat';
 import * as errors from './Errors';
@@ -14,6 +17,11 @@ const globAsync = promisify(glob);
 import { util } from './util';
 import { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
+import _ from 'denodeify';
+import { exec } from 'child_process';
+import { Cipher } from 'crypto';
+import { head } from 'request';
+
 
 export class RokuDeploy {
 
@@ -23,10 +31,12 @@ export class RokuDeploy {
 
     private logger: Logger;
     //store the import on the class to make testing easier
-    public request = request;
+
     public fsExtra = _fsExtra;
 
-    pressHomeButtonWaitIntervalInMillis = 10000;
+    public client;
+
+    pressHomeButtonWaitIntervalInMillis = 5000;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -407,18 +417,22 @@ export class RokuDeploy {
         }));
     }
 
-    private generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): request.OptionsWithUrl {
+    private async generateBaseRequestOptions(requestPath: string, options: RokuDeployOptions): Promise<http.RequestOptions> {
         options = this.getOptions(options);
-        let url = `http://${options.host}:${options.packagePort}/${requestPath}`;
         let baseRequestOptions = {
-            url: url,
-            timeout: options.timeout,
-            auth: {
-                user: options.username,
-                pass: options.password,
-                sendImmediately: false
-            }
+            protocol: 'http:',
+            host: options.host,
+            port: options.packagePort,
+            path: requestPath.startsWith('/') ? requestPath : `/${requestPath}`,
+            timeout: options.timeout
         };
+
+        this.client = new DigestFetch(options.username, options.password);
+        await this.doGetRequest({
+            ...baseRequestOptions,
+            path: '/'
+        });
+
         return baseRequestOptions;
     }
 
@@ -429,15 +443,18 @@ export class RokuDeploy {
      * @param port - the port that should be used for the request. defaults to 8060
      * @param timeout - request timeout duration in milliseconds. defaults to 150000
      */
-    public async pressHomeButton(host, port?: number, timeout?: number) {
+    public async pressHomeButton(host: string, port?: number, timeout?: number) {
         let options = this.getOptions();
         port = port ? port : options.remotePort;
         timeout = timeout ? timeout : options.timeout;
         // press the home button to return to the main screen
         let result = await this.doPostRequest({
-            url: `http://${host}:${port}/keypress/Home`,
+            protocol: 'http:',
+            host: host,
+            port: port,
+            path: '/keypress/Home',
             timeout: timeout
-        }, false);
+        });
 
         // Wait for device to possibly leave current application or screensaver
         await util.sleep(this.pressHomeButtonWaitIntervalInMillis);
@@ -467,17 +484,16 @@ export class RokuDeploy {
             await new Promise((resolve) => {
                 readStream.on('open', resolve);
             });
-            let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
-            requestOptions.formData = {
-                mysubmit: 'Replace',
-                archive: readStream
-            };
+            let requestOptions = await this.generateBaseRequestOptions('/plugin_install', options);
 
+            let formData = new FormData();
+            formData.append('mysubmit', 'Replace');
+            formData.append('archive', readStream);
             if (options.remoteDebug) {
-                requestOptions.formData.remotedebug = '1';
+                formData.append('remotedebug', '1');
             }
 
-            let results = await this.doPostRequest(requestOptions);
+            let results = await this.doPostRequest(requestOptions, formData);
             if (options.failOnCompileError) {
                 if (results.body.indexOf('Install Failure: Compilation Failed.') > -1) {
                     throw new errors.CompileError('Compile error', results);
@@ -506,13 +522,15 @@ export class RokuDeploy {
         if (!options.host) {
             throw new errors.MissingRequiredOptionError('must specify the host for the Roku device');
         }
-        let requestOptions = this.generateBaseRequestOptions('plugin_install', options);
-        requestOptions.formData = {
-            archive: '',
-            mysubmit: 'Convert to squashfs'
-        };
+        let requestOptions = await this.generateBaseRequestOptions('/plugin_install', options);
 
-        let results = await this.doPostRequest(requestOptions);
+        let formData = new FormData();
+        formData.append('mysubmit', 'Convert to squashfs');
+        formData.append('archive', '', {
+            //empty archive to trigger squashfs conversion
+        });
+
+        let results = await this.doPostRequest(requestOptions, formData);
         if (results.body.indexOf('Conversion succeeded') === -1) {
             throw new errors.ConvertError('Squashfs conversion failed');
         }
@@ -536,21 +554,19 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.rekeySignedPackage)) {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
-        
         let readStream = this.fsExtra.createReadStream(rekeySignedPackagePath);
         //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
         await new Promise((resolve) => {
             readStream.on('open', resolve);
         });
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_inspect', options);
-        requestOptions.formData = {
-            mysubmit: 'Rekey',
-            passwd: options.signingPassword,
-            archive: readStream 
-        };
+        let requestOptions = await this.generateBaseRequestOptions('/plugin_inspect', options);
+        let formData = new FormData();
+        formData.append('mysubmit', 'Rekey');
+        formData.append('passwd', options.signingPassword);
+        formData.append('archive', readStream);
 
-        let results = await this.doPostRequest(requestOptions);
+        let results = await this.doPostRequest(requestOptions, formData);
         let resultTextSearch = /<font color="red">([^<]+)<\/font>/.exec(results.body);
         if (!resultTextSearch) {
             throw new errors.UnparsableDeviceResponseError('Unknown Rekey Failure');
@@ -586,16 +602,15 @@ export class RokuDeploy {
         // Delete the current signed package
         await this.deleteSignedPackage(options);
 
-        let requestOptions = this.generateBaseRequestOptions('plugin_package', options);
+        let requestOptions = await this.generateBaseRequestOptions('/plugin_package', options);
 
-        requestOptions.formData = {
-            mysubmit: 'Package',
-            pkg_time: (new Date()).getTime(), //eslint-disable-line camelcase
-            passwd: options.signingPassword,
-            app_name: appName //eslint-disable-line camelcase
-        };
+        let formData = new FormData();
+        formData.append('mysubmit', 'Package');
+        formData.append('pkg_time', (new Date()).getTime()); //eslint-disable-line camelcase
+        formData.append('passwd', options.signingPassword);
+        formData.append('app_name', appName);
 
-        let results = await this.doPostRequest(requestOptions);
+        let results = await this.doPostRequest(requestOptions, formData);
 
         let failedSearchMatches = /<font.*>Failed: (.*)/.exec(results.body);
         if (failedSearchMatches) {
@@ -617,36 +632,66 @@ export class RokuDeploy {
      */
     public async retrieveSignedPackage(pkgPath: string, options: RokuDeployOptions): Promise<string> {
         options = this.getOptions(options);
-        let requestOptions = this.generateBaseRequestOptions(pkgPath, options);
+        let requestOptions = await this.generateBaseRequestOptions(pkgPath, options);
 
         let pkgFilePath = this.getOutputPkgFilePath(options);
 
         await this.fsExtra.ensureDir(path.dirname(pkgFilePath));
 
-        return new Promise<string>((resolve, reject) => {
-            this.request.get(requestOptions)
-                .on('error', (err) => reject(err))
-                .on('response', (response) => {
-                    if (response.statusCode !== 200) {
-                        reject(new Error('Invalid response code: ' + response.statusCode));
-                    }
-                    resolve(pkgFilePath);
-                })
-                .pipe(this.fsExtra.createWriteStream(pkgFilePath));
+        let results: { response: any; body: any } = await new Promise((resolve, reject) => {
+
+            const uri = `${requestOptions.protocol}//${requestOptions.host}:${requestOptions.port}${requestOptions.path}`;
+            const options = { method: 'GET' };
+            (this.client ? this.client.fetch(uri, options) : fetch(uri, options)).then((response) => {
+                if (response.status === 200) {
+                    response.body.pipe(this.fsExtra.createWriteStream(pkgFilePath)).on('finish', () => {
+                        resolve({ response: response, body: { path: pkgFilePath } });
+                    });
+                } else {
+                    throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + response.status, { response: response });
+                }
+                response.body.on('error', (err) => {
+                    reject(err);
+                });
+            }).catch((err) => {
+                reject(err);
+            });
         });
+
+        return results.body.path;
     }
 
     /**
      * Centralized function for handling POST http requests
      * @param params
      */
-    private async doPostRequest(params: any, verify = true) {
+    private async doPostRequest(requestOptions: http.RequestOptions, formData?: FormData, verify = true) {
+        let headers = formData ? formData.getHeaders() : {};
+
+        if (formData) {
+            let contentLength = await new Promise((resolve, reject) => {
+                formData.getLength((err, length) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(length);
+                    }
+                });
+            });
+            headers['Content-Length'] = contentLength;
+
+        }
+
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-            this.request.post(params, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
+
+            const uri = `${requestOptions.protocol}//${requestOptions.host}:${requestOptions.port}${requestOptions.path}`;
+            const options = { method: 'POST', headers: headers, body: formData };
+            (this.client ? this.client.fetch(uri, options) : fetch(uri, options)).then((response) => {
+                response.text().then((body) => {
+                    resolve({ response: response, body: body });
+                });
+            }).catch((err) => {
+                reject(err);
             });
         });
         if (verify) {
@@ -659,15 +704,20 @@ export class RokuDeploy {
      * Centralized function for handling GET http requests
      * @param params
      */
-    private async doGetRequest(params: any) {
+    private async doGetRequest(requestOptions: http.RequestOptions) {
         let results: { response: any; body: any } = await new Promise((resolve, reject) => {
-            this.request.get(params, (err, resp, body) => {
-                if (err) {
-                    return reject(err);
-                }
-                return resolve({ response: resp, body: body });
+
+            const uri = `${requestOptions.protocol}//${requestOptions.host}:${requestOptions.port}${requestOptions.path}`;
+            const options = { method: 'GET' };
+            (this.client ? this.client.fetch(uri, options) : fetch(uri, options)).then((response) => {
+                response.text().then((body) => {
+                    resolve({ response: response, body: body });
+                });
+            }).catch((err) => {
+                reject(err);
             });
         });
+
         this.checkRequest(results);
         return results;
     }
@@ -679,7 +729,7 @@ export class RokuDeploy {
 
         this.logger.debug(results.body);
 
-        if (results.response.statusCode === 401) {
+        if (results.response.status === 401) {
             throw new errors.UnauthorizedDeviceResponseError('Unauthorized. Please verify username and password for target Roku.', results);
         }
 
@@ -689,8 +739,8 @@ export class RokuDeploy {
             throw new errors.FailedDeviceResponseError(rokuMessages.errors[0], rokuMessages);
         }
 
-        if (results.response.statusCode !== 200) {
-            throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + results.response.statusCode, results);
+        if (results.response.status !== 200) {
+            throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + results.response.status, results);
         }
     }
 
@@ -732,12 +782,10 @@ export class RokuDeploy {
     public async deploy(options?: RokuDeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
         options = this.getOptions(options);
         await this.createPackage(options, beforeZipCallback);
-        console.log("deleting current package");
-        await this.deleteInstalledChannel(options);
-        // Wait for device to possibly leave current application or screensaver
-        await util.sleep(this.pressHomeButtonWaitIntervalInMillis);
 
-        console.log("publishing package...");
+        await this.deleteInstalledChannel(options);
+
+
         let result = await this.publish(options);
         return result;
     }
@@ -748,20 +796,18 @@ export class RokuDeploy {
      */
     public async deleteInstalledChannel(options?: RokuDeployOptions) {
         options = this.getOptions(options);
-        
         // Leave channel if it is running. Deleting when a channel is still running might
         // cause a crash
         // Issue: https://github.com/rokucommunity/roku-deploy/issues/41
         await this.pressHomeButton(options.host);
 
-        let deleteOptions = this.generateBaseRequestOptions('plugin_install', options);
-        deleteOptions.formData = {
-            mysubmit: 'Delete',
-            archive: ''
-        };
-
         try {
-             await this.doPostRequest(deleteOptions);
+            let deleteOptions = await this.generateBaseRequestOptions('/plugin_install', options);
+            let formData = new FormData();
+            formData.append('mysubmit', 'Delete');
+            formData.append('archive', '');
+
+            await this.doPostRequest(deleteOptions, formData);
         } catch (exception) {
             if (exception.message.indexOf('Delete Failed: No such file') === -1 && exception.message.indexOf('Uninstall Success') === -1) {
                 throw exception;
@@ -776,20 +822,18 @@ export class RokuDeploy {
      */
     async deleteSignedPackage(options?: RokuDeployOptions) {
         options = this.getOptions(options);
-        
-        let deleteOptions = this.generateBaseRequestOptions('plugin_package', options);
-        deleteOptions.formData = {
-            mysubmit: 'Delete',
-            pkg_time: '0',
-            app_name:'',
-            passwd: ''
-        };
+        let deleteOptions = await this.generateBaseRequestOptions('/plugin_package', options);
+
+        let formData = new FormData();
+        formData.append('mysubmit', 'Delete');
+        formData.append('pkg_time', '0'); //eslint-disable-line camelcase
+        formData.append('app_name', ''); //eslint-disable-line camelcase
+        formData.append('passwd', '');
 
         try {
-             await this.doPostRequest(deleteOptions);
+            await this.doPostRequest(deleteOptions, formData);
         } catch (exception) {
             if (exception.message.indexOf('Delete Succeeded') === -1) {
-                console.log("The error happened here indeed, sir");
                 throw exception;
             }
         }
@@ -803,19 +847,12 @@ export class RokuDeploy {
         let originalOptionValueRetainStagingFolder = options.retainStagingFolder;
         options = this.getOptions(options);
         options.retainStagingFolder = true;
-        console.log("deploying..");
         await this.deploy(options, beforeZipCallback);
-        console.log("deployed!");
-        console.log("converting to squashfs...");
         if (options.convertToSquashfs) {
             await this.convertToSquashfs(options);
         }
-
-        console.log("converted to squash..");
         let remotePkgPath = await this.signExistingPackage(options);
-        console.log("signed the package...");
         let localPkgFilePath = await this.retrieveSignedPackage(remotePkgPath, options);
-        console.log("retrieved the package");
         if (originalOptionValueRetainStagingFolder !== true) {
             await this.fsExtra.remove(options.stagingFolderPath);
         }
@@ -930,7 +967,10 @@ export class RokuDeploy {
         options = this.getOptions(options);
 
         const requestOptions = {
-            url: `http://${options.host}:${options.remotePort}/query/device-info`,
+            protocol: 'http:',
+            host: options.host,
+            port: options.remotePort,
+            path: '/query/device-info',
             timeout: options.timeout
         };
         let results = await this.doGetRequest(requestOptions);
@@ -944,7 +984,7 @@ export class RokuDeploy {
         }
     }
 
-    public async getDevId(options?: RokuDeployOptions) {
+    public async getDevId(options?: RokuDeployOptions): Promise<string> {
         const deviceInfo = await this.getDeviceInfo(options);
         return deviceInfo['keyed-developer-id'];
     }

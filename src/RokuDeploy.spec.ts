@@ -87,7 +87,7 @@ describe('index', () => {
     describe('doPostRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
                 return {} as any;
             });
@@ -98,7 +98,7 @@ describe('index', () => {
 
         it('should throw an error for a network error', async () => {
             let error = new Error('Network Error');
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, error);
                 return {} as any;
             });
@@ -114,7 +114,7 @@ describe('index', () => {
 
         it('should throw an error for a wrong response code if verify is true', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 500 }, body);
                 return {} as any;
             });
@@ -130,7 +130,7 @@ describe('index', () => {
 
         it('should not throw an error for a response code if verify is false', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 500 }, body);
                 return {} as any;
             });
@@ -143,7 +143,7 @@ describe('index', () => {
     describe('doGetRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.request, 'get').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'get').callsFake((_, callback) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
                 return {} as any;
             });
@@ -154,7 +154,7 @@ describe('index', () => {
 
         it('should throw an error for a network error', async () => {
             let error = new Error('Network Error');
-            sinon.stub(rokuDeploy.request, 'get').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'get').callsFake((_, callback) => {
                 process.nextTick(callback, error);
                 return {} as any;
             });
@@ -581,11 +581,11 @@ describe('index', () => {
     describe('pressHomeButton', () => {
         it('rejects promise on error', () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
                 process.nextTick(callback, new Error());
                 return {} as any;
             });
-            return rokuDeploy.pressHomeButton({}).then(() => {
+            return rokuDeploy.pressHomeButton('aa').then(() => {
                 assert.fail('Should have rejected the promise');
             }, () => {
                 expect(true).to.be.true;
@@ -708,7 +708,7 @@ describe('index', () => {
 
         it('throws when package upload fails', async () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.request, 'post').callsFake((data: any, callback: any) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((data: any, callback: any) => {
                 if (data.url === `http://${options.host}/plugin_install`) {
                     process.nextTick(() => {
                         callback(new Error('Failed to publish to server'));
@@ -999,7 +999,7 @@ describe('index', () => {
             let error = new Error('Network Error');
             try {
                 //intercept the post requests
-                sinon.stub(rokuDeploy.request, 'post').callsFake((_, callback) => {
+                sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
                     process.nextTick(callback, error);
                     return {} as any;
                 });
@@ -2268,7 +2268,7 @@ describe('index', () => {
             sinon.stub(rokuDeploy.fsExtra, 'createWriteStream').returns(null);
 
             //intercept the http request
-            sinon.stub(rokuDeploy.request, 'get').callsFake(() => {
+            sinon.stub(rokuDeploy.client, 'get').callsFake(() => {
                 let request: any = {
                     on: (event, callback) => {
                         process.nextTick(() => {
