@@ -479,7 +479,10 @@ export class RokuDeploy {
             if ((await this.fsExtra.pathExists(zipFilePath)) === false) {
                 throw new Error(`Cannot publish because file does not exist at '${zipFilePath}'`);
             }
-            let readStream = this.fsExtra.createReadStream(zipFilePath);
+            let readStream = this.fsExtra.createReadStream(zipFilePath, {
+                highWaterMark: (16 * 1024)
+            });
+
             //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
             await new Promise((resolve) => {
                 readStream.on('open', resolve);
@@ -554,7 +557,10 @@ export class RokuDeploy {
         if (!path.isAbsolute(options.rekeySignedPackage)) {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
-        let readStream = this.fsExtra.createReadStream(rekeySignedPackagePath);
+        let readStream = this.fsExtra.createReadStream(rekeySignedPackagePath, {
+                highWaterMark: (16 * 1024)
+        });
+
         //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
         await new Promise((resolve) => {
             readStream.on('open', resolve);
