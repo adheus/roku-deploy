@@ -36,8 +36,6 @@ export class RokuDeploy {
 
     public client;
 
-    pressHomeButtonWaitIntervalInMillis = 5000;
-
     /**
      * Copies all of the referenced files to the staging folder
      * @param options
@@ -456,9 +454,6 @@ export class RokuDeploy {
             timeout: timeout
         });
 
-        // Wait for device to possibly leave current application or screensaver
-        await util.sleep(this.pressHomeButtonWaitIntervalInMillis);
-
         return result;
     }
 
@@ -745,7 +740,7 @@ export class RokuDeploy {
             throw new errors.FailedDeviceResponseError(rokuMessages.errors[0], rokuMessages);
         }
 
-        if (results.response.status !== 200) {
+        if (!(results.response.status >= 200 && results.response.status < 300)) {
             throw new errors.InvalidDeviceResponseCodeError('Invalid response code: ' + results.response.status, results);
         }
     }
