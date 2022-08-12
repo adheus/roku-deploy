@@ -1065,7 +1065,7 @@ export class RokuDeploy {
                 }
                 zip.file(file.dest.replace(/[\\/]/g, '/'), data, {
                     compression: compression
-                });
+                } as JSZip.JSZipFileOptions);
             });
             promises.push(promise);
         }
