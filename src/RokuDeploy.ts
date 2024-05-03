@@ -1055,12 +1055,11 @@ export class RokuDeploy {
                 }
 
                 const ext = path.extname(file.dest).toLowerCase();
-                let compression = 'DEFLATE';
+                let compression: 'STORE' | 'DEFLATE' = 'DEFLATE';
 
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
-                // @ts-ignore
                 zip.file(file.dest.replace(/[\\/]/g, '/'), data, {
                     compression: compression
                 } as JSZip.JSZipFileOptions);
