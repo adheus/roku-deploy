@@ -1,6 +1,6 @@
 {
-    "name": "roku-deploy",
-    "version": "3.4.1",
+    "name": "@adheus/roku-deploy",
+    "version": "3.4.2",
     "description": "Package and publish a Roku application using Node.js",
     "main": "dist/index.js",
     "scripts": {
@@ -68,7 +68,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/RokuCommunity/roku-deploy.git"
+        "url": "https://github.com/adheus/roku-deploy.git"
     },
     "author": "",
     "license": "ISC",
