@@ -87,7 +87,7 @@ describe('index', () => {
     describe('doPostRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback: any) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
                 return {} as any;
             });
@@ -98,7 +98,7 @@ describe('index', () => {
 
         it('should throw an error for a network error', async () => {
             let error = new Error('Network Error');
-            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback: any) => {
                 process.nextTick(callback, error);
                 return {} as any;
             });
@@ -114,7 +114,7 @@ describe('index', () => {
 
         it('should throw an error for a wrong response code if verify is true', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback: any) => {
                 process.nextTick(callback, undefined, { statusCode: 500 }, body);
                 return {} as any;
             });
@@ -130,7 +130,7 @@ describe('index', () => {
 
         it('should not throw an error for a response code if verify is false', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback: any) => {
                 process.nextTick(callback, undefined, { statusCode: 500 }, body);
                 return {} as any;
             });
@@ -143,7 +143,7 @@ describe('index', () => {
     describe('doGetRequest', () => {
         it('should not throw an error for a successful request', async () => {
             let body = 'responseBody';
-            sinon.stub(rokuDeploy.client, 'get').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'get').callsFake((_, callback: any) => {
                 process.nextTick(callback, undefined, { statusCode: 200 }, body);
                 return {} as any;
             });
@@ -154,7 +154,7 @@ describe('index', () => {
 
         it('should throw an error for a network error', async () => {
             let error = new Error('Network Error');
-            sinon.stub(rokuDeploy.client, 'get').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'get').callsFake((_, callback: any) => {
                 process.nextTick(callback, error);
                 return {} as any;
             });
@@ -349,7 +349,8 @@ describe('index', () => {
                 return Promise.resolve;
             });
             const copyPaths = [] as Array<{ src: string; dest: string }>;
-            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src, dest) => {
+            // @ts-ignore
+            sinon.stub(rokuDeploy.fsExtra as any, 'copy').callsFake((src: string, dest: string) => {
                 copyPaths.push({ src: src, dest: dest });
                 return Promise.resolve();
             });
@@ -396,7 +397,7 @@ describe('index', () => {
                 options.stagingFolderPath = s`${tmpPath}/path/to/nowhere`;
                 fsExtra.ensureDirSync(options.stagingFolderPath);
                 await rokuDeploy.zipPackage(options);
-            } catch (e) {
+            } catch (e: any) {
                 err = e;
             }
             expect(err).to.exist;
@@ -408,7 +409,7 @@ describe('index', () => {
             try {
                 options.stagingFolderPath = s`${tmpPath}/path/to/nowhere`;
                 await rokuDeploy.zipPackage(options);
-            } catch (e) {
+            } catch (e: any) {
                 err = e;
             }
             expect(err).to.exist;
@@ -581,7 +582,7 @@ describe('index', () => {
     describe('pressHomeButton', () => {
         it('rejects promise on error', () => {
             //intercept the post requests
-            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
+            sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback: any) => {
                 process.nextTick(callback, new Error());
                 return {} as any;
             });
@@ -691,7 +692,7 @@ describe('index', () => {
             try {
                 await rokuDeploy.publish(options);
                 throw new Error('publish should have thrown an exception');
-            } catch (e) {
+            } catch (e: any) {
                 let zipFilePath = rokuDeploy.getOutputZipFilePath(options);
                 expect(e.message).to.equal(`Cannot publish because file does not exist at '${zipFilePath}'`);
             }
@@ -988,7 +989,7 @@ describe('index', () => {
             options.signingPassword = undefined;
             try {
                 await rokuDeploy.signExistingPackage(options);
-            } catch (e) {
+            } catch (e: any) {
                 expect(e.message).to.equal('Must supply signingPassword');
                 return;
             }
@@ -999,7 +1000,7 @@ describe('index', () => {
             let error = new Error('Network Error');
             try {
                 //intercept the post requests
-                sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback) => {
+                sinon.stub(rokuDeploy.client, 'post').callsFake((_, callback: any) => {
                     process.nextTick(callback, error);
                     return {} as any;
                 });
@@ -1031,7 +1032,7 @@ describe('index', () => {
 
             try {
                 await rokuDeploy.signExistingPackage(options);
-            } catch (e) {
+            } catch (e: any) {
                 expect(e.message).to.equal('Invalid Password.');
                 return;
             }
@@ -1052,7 +1053,7 @@ describe('index', () => {
             try {
                 mockDoPostRequest();
                 await rokuDeploy.signExistingPackage(options);
-            } catch (e) {
+            } catch (e: any) {
                 expect(e.message).to.equal('Unknown error signing package');
                 return;
             }
@@ -1572,7 +1573,7 @@ describe('index', () => {
             let invalidManifestPath = 'invalid-path';
             try {
                 await rokuDeploy.parseManifest(invalidManifestPath);
-            } catch (e) {
+            } catch (e: any) {
                 expect(e.message).to.equal(invalidManifestPath + ' does not exist');
                 return;
             }
@@ -2306,7 +2307,7 @@ describe('index', () => {
                 await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
                     outFile: 'roku-deploy-test'
                 });
-            } catch (e) {
+            } catch (e: any) {
                 expect(e.message).to.equal('Some error');
                 return;
             }
@@ -2325,7 +2326,7 @@ describe('index', () => {
                 await rokuDeploy.retrieveSignedPackage('path_to_pkg', {
                     outFile: 'roku-deploy-test'
                 });
-            } catch (e) {
+            } catch (e: any) {
                 expect(e.message.indexOf('Invalid response code')).to.equal(0);
                 return;
             }
@@ -2398,7 +2399,7 @@ describe('index', () => {
                         'source/main.brs'
                     ]
                 });
-            } catch (e) {
+            } catch (e:any) {
                 error = e;
             }
             expect(error, 'Should have thrown error').to.exist;
@@ -2504,10 +2505,10 @@ describe('index', () => {
                 {
                     "rootDir": "src"
             `);
-            let ex;
+            let ex: any;
             try {
                 let options = rokuDeploy.getOptions(undefined);
-            } catch (e) {
+            } catch (e: any) {
                 ex = e;
             }
             expect(ex).to.exist;

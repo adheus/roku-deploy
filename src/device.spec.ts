@@ -51,7 +51,7 @@ describe('device', function device() {
             options.password = 'NOT_THE_PASSWORD';
             try {
                 let response = await rokuDeploy.deploy(options);
-            } catch (e) {
+            } catch (e: any) {
                 assert.equal(e.message, 'Unauthorized. Please verify username and password for target Roku.');
                 return;
             }
@@ -66,7 +66,7 @@ describe('device', function device() {
                 await rokuDeploy.deleteInstalledChannel(options);
                 // Run again to make sure it doesn't fail when the channel is already deleted
                 await rokuDeploy.deleteInstalledChannel(options);
-            } catch (e) {
+            } catch (e:any) {
                 assert.fail(e.message);
             }
         });
@@ -76,7 +76,7 @@ describe('device', function device() {
         it('works', async () => {
             try {
                 await rokuDeploy.rekeyDevice(options);
-            } catch (e) {
+            } catch (e: any) {
                 assert.fail(e.message);
             }
         });

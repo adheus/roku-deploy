@@ -18,9 +18,6 @@ import { util } from './util';
 import { RokuDeployOptions, FileEntry } from './RokuDeployOptions';
 import { Logger, LogLevel } from './Logger';
 import _ from 'denodeify';
-import { exec } from 'child_process';
-import { Cipher } from 'crypto';
-import { head } from 'request';
 
 
 export class RokuDeploy {
@@ -34,7 +31,7 @@ export class RokuDeploy {
 
     public fsExtra = _fsExtra;
 
-    public client;
+    public client: any;
 
     /**
      * Copies all of the referenced files to the staging folder
@@ -553,7 +550,7 @@ export class RokuDeploy {
             rekeySignedPackagePath = path.join(options.rootDir, options.rekeySignedPackage);
         }
         let readStream = this.fsExtra.createReadStream(rekeySignedPackagePath, {
-                highWaterMark: (16 * 1024)
+            highWaterMark: (16 * 1024)
         });
 
         //wait for the stream to open (no harm in doing this, and it helps solve an issue in the tests)
@@ -809,7 +806,7 @@ export class RokuDeploy {
             formData.append('archive', '');
 
             await this.doPostRequest(deleteOptions, formData);
-        } catch (exception) {
+        } catch (exception: any) {
             if (exception.message.indexOf('Delete Failed: No such file') === -1 && exception.message.indexOf('Uninstall Success') === -1) {
                 throw exception;
             }
@@ -833,7 +830,7 @@ export class RokuDeploy {
 
         try {
             await this.doPostRequest(deleteOptions, formData);
-        } catch (exception) {
+        } catch (exception: any) {
             if (exception.message.indexOf('Delete Succeeded') === -1) {
                 throw exception;
             }
