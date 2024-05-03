@@ -1060,6 +1060,7 @@ export class RokuDeploy {
                 if (ext === '.jpg' || ext === '.png' || ext === '.jpeg') {
                     compression = 'STORE';
                 }
+                // @ts-ignore
                 zip.file(file.dest.replace(/[\\/]/g, '/'), data, {
                     compression: compression
                 } as JSZip.JSZipFileOptions);
