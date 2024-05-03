@@ -4,6 +4,7 @@
     "description": "Package and publish a Roku application using Node.js",
     "main": "dist/index.js",
     "scripts": {
+        "rimraf": "./node_modules/rimraf/bin.js",
         "prepare": "npm run build",
         "build": "rimraf dist && tsc",
         "preversion": "npm run build && npm run lint && npm run test",
