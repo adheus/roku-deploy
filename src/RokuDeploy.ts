@@ -685,7 +685,9 @@ export class RokuDeploy {
             const uri = `${requestOptions.protocol}//${requestOptions.host}:${requestOptions.port}${requestOptions.path}`;
             const options = { method: 'POST', headers: headers, body: formData };
             (this.client ? this.client.fetch(uri, options) : fetch(uri, options)).then((response) => {
-                response.text().then((body) => {
+                // Return the body read so a failure reaches the catch below; unhandled, it
+                // crashed the process and left this promise pending.
+                return response.text().then((body) => {
                     resolve({ response: response, body: body });
                 });
             }).catch((err) => {
@@ -708,7 +710,9 @@ export class RokuDeploy {
             const uri = `${requestOptions.protocol}//${requestOptions.host}:${requestOptions.port}${requestOptions.path}`;
             const options = { method: 'GET' };
             (this.client ? this.client.fetch(uri, options) : fetch(uri, options)).then((response) => {
-                response.text().then((body) => {
+                // Return the body read so a failure reaches the catch below; unhandled, it
+                // crashed the process and left this promise pending.
+                return response.text().then((body) => {
                     resolve({ response: response, body: body });
                 });
             }).catch((err) => {
@@ -831,7 +835,10 @@ export class RokuDeploy {
         try {
             await this.doPostRequest(deleteOptions, formData);
         } catch (exception: any) {
-            if (exception.message.indexOf('Delete Succeeded') === -1) {
+            // When the page is an exact multiple of the Roku's 512-byte chunk size, the Roku ends
+            // the reply with the zero-length chunk twice. The delete has already happened, but
+            // Node's HTTP parser rejects the extra bytes with HPE_INVALID_CONSTANT.
+            if (exception.message.indexOf('Delete Succeeded') === -1 && exception.code !== 'HPE_INVALID_CONSTANT') {
                 throw exception;
             }
         }
